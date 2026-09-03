@@ -96,6 +96,14 @@ jobs:
           SPARK_MESSAGE_TEMPLATE: ${{ secrets.SPARK_MESSAGE_TEMPLATE }}
         run: bun src/main.ts
 
+      - name: 上传失败截图 (Upload failure screenshots)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots-${{ github.run_id }}
+          path: artifacts/*.png
+          if-no-files-found: ignore
+
       - name: 检查邮件配置 (Check mail configuration)
         id: mail-config
         if: ${{ always() }}
