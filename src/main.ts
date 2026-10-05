@@ -9,6 +9,7 @@ import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import type { DouyinCookie, SameSite } from './types/douyin-cookie'
 import type { Yiyan } from './types/yiyan'
+import { resolveDryRun, submitMessage, waitForChatSearch } from './chat-session'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   const browserPath = resolveBrowserPath()
   const headless = resolveHeadless()
   const autoClose = resolveAutoClose()
+  const dryRun = resolveDryRun()
   const includeYiyanSource = resolveYiyanIncludeSource()
   const globalMessageTemplate = resolveSparkMessageTemplate()
   const accounts = resolveDouyinAccounts(globalMessageTemplate)
@@ -69,7 +71,7 @@ async function main(): Promise<void> {
   try {
     for (const account of accounts) {
       try {
-        await runDouyinAccount(browser, account, yiyans, includeYiyanSource, autoClose)
+        await runDouyinAccount(browser, account, yiyans, includeYiyanSource, autoClose, dryRun)
       } catch (error) {
         const accountError = toError(error)
         failures.push(
@@ -114,6 +116,7 @@ async function runDouyinAccount(
   yiyans: Yiyan[],
   includeYiyanSource: boolean,
   autoClose: boolean,
+  dryRun: boolean,
 ): Promise<void> {
   const context = await browser.newContext()
   let page: Page | undefined
@@ -127,15 +130,7 @@ async function runDouyinAccount(
       waitUntil: 'domcontentloaded',
     })
 
-    const searchInput = page.locator('input.semi-input[placeholder="搜索"]').first()
-    const searchVisible = await searchInput
-      .waitFor({ state: 'visible', timeout: CHAT_PAGE_READY_TIMEOUT })
-      .then(() => true)
-      .catch(() => false)
-
-    if (!searchVisible) {
-      throw new Error('聊天页搜索框未出现，Cookie 可能已经失效')
-    }
+    const searchInput = await waitForChatSearch(page, CHAT_PAGE_READY_TIMEOUT)
 
     await waitForChatListReady(page, account.name)
 
@@ -166,7 +161,6 @@ async function runDouyinAccount(
         )
         .first()
       await editorInput.waitFor({ state: 'visible', timeout: 10000 })
-      await editorInput.click()
 
       let message: string
 
@@ -182,9 +176,12 @@ async function runDouyinAccount(
         message = includeYiyanSource ? `${yiyan.hitokoto}\n——「${yiyan.from}」` : yiyan.hitokoto
       }
 
-      await page.keyboard.insertText(message)
-      await page.keyboard.press('Enter')
-      console.log(`[${account.name}] 已发送消息：${targetName}`)
+      await submitMessage(page, editorInput, message, dryRun)
+      console.log(
+        dryRun
+          ? `[${account.name}] 无发送验证通过：${targetName}（未输入或发送消息）`
+          : `[${account.name}] 已提交消息：${targetName}`,
+      )
       await page.waitForTimeout(1000)
     }
 
@@ -198,7 +195,7 @@ async function runDouyinAccount(
       )
     }
 
-    console.log(`账号执行完成：${account.name}`)
+    console.log(`${dryRun ? '无发送验证完成' : '账号执行完成'}：${account.name}`)
   } catch (error) {
     await captureFailureScreenshot(page, account.name)
     throw error

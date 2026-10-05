@@ -4,8 +4,10 @@
   "license": "GPL-3.0-only",
   "scripts": {
     "dev": "tsx src/main.ts",
+    "refresh-cookie": "tsx src/refresh-cookie.ts",
+    "test": "tsx --test tests/*.test.ts",
     "prepare": "husky",
-    "check": "pnpm run \"/^(type-check|lint:check|format:check)$/\"",
+    "check": "pnpm run \"/^(type-check|lint:check|format:check|test)$/\"",
     "type-check": "tsc --noEmit",
     "lint:check": "oxlint",
     "format:check": "oxfmt --check",
