@@ -149,6 +149,7 @@ cp .env.example .env
 | `PLAYWRIGHT_HEADLESS` | ❌ | `true` | 是否使用无头模式 |
 | `AUTO_CLOSE` | ❌ | `true` | 发送完成后是否自动关闭浏览器 |
 | `DRY_RUN` | ❌ | `false` | 为 `true` 时仅验证登录与好友定位，不输入或发送消息 |
+| `SPARK_MESSAGE_MODE` | ❌ | `default` | `daily` 按北京时间每日轮换消息；`default` 沿用自定义模板/一言 |
 
 #### 3️⃣ 启动项目
 
@@ -172,6 +173,13 @@ pnpm dev
 `cookie` 字段。凭据文件已加入 `.gitignore`，不要上传到代码仓库或聊天。
 更新后先手动运行并保持 `dry_run` 勾选，确认登录与所有好友定位通过，再取消勾选续火或等待定时任务。
 开发检查用 `pnpm check`；回归测试只加载本地 HTML，不访问抖音。
+
+### 每天更换续火内容
+
+当前工作流启用 `SPARK_MESSAGE_MODE=daily`，从 `assets/spark-messages.json` 的 30 条简短续火消息中
+按北京时间每天选一条，30 天循环。同一天补跑使用同一条，跨北京时间午夜会更换；该模式优先于自定义模板。
+修改这个 JSON 数组即可换消息库，至少保留两条不同且非空的内容。
+将模式改为 `default` 可恢复原来的自定义模板或随机一言。
 
 
 ## 📮 邮件通知配置

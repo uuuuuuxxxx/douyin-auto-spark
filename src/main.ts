@@ -10,6 +10,11 @@ import timezone from 'dayjs/plugin/timezone'
 import type { DouyinCookie, SameSite } from './types/douyin-cookie'
 import type { Yiyan } from './types/yiyan'
 import { resolveDryRun, submitMessage, waitForChatSearch } from './chat-session'
+import {
+  readDailySparkMessages,
+  resolveSparkMessageMode,
+  selectDailySparkMessage,
+} from './daily-message'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -58,6 +63,9 @@ async function main(): Promise<void> {
   const headless = resolveHeadless()
   const autoClose = resolveAutoClose()
   const dryRun = resolveDryRun()
+  const messageMode = resolveSparkMessageMode()
+  const dailyMessage =
+    messageMode === 'daily' ? selectDailySparkMessage(await readDailySparkMessages()) : undefined
   const includeYiyanSource = resolveYiyanIncludeSource()
   const globalMessageTemplate = resolveSparkMessageTemplate()
   const accounts = resolveDouyinAccounts(globalMessageTemplate)
@@ -71,7 +79,15 @@ async function main(): Promise<void> {
   try {
     for (const account of accounts) {
       try {
-        await runDouyinAccount(browser, account, yiyans, includeYiyanSource, autoClose, dryRun)
+        await runDouyinAccount(
+          browser,
+          account,
+          yiyans,
+          includeYiyanSource,
+          autoClose,
+          dryRun,
+          dailyMessage,
+        )
       } catch (error) {
         const accountError = toError(error)
         failures.push(
@@ -117,6 +133,7 @@ async function runDouyinAccount(
   includeYiyanSource: boolean,
   autoClose: boolean,
   dryRun: boolean,
+  dailyMessage: string | undefined,
 ): Promise<void> {
   const context = await browser.newContext()
   let page: Page | undefined
@@ -164,7 +181,9 @@ async function runDouyinAccount(
 
       let message: string
 
-      if (account.messageTemplate !== undefined) {
+      if (dailyMessage !== undefined) {
+        message = dailyMessage
+      } else if (account.messageTemplate !== undefined) {
         message = renderMessageTemplate(
           account.messageTemplate,
           account.name,
