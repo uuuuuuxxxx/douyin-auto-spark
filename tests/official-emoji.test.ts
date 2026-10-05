@@ -54,9 +54,9 @@ async function installFixture(
         <circle cx="16" cy="16" r="15"></circle>
       </svg>
     </div>
+    <div class="componentsemojiim-saas-modal" style="width: 0; height: 0; position: relative">
     <div class="semi-modal-wrap" style="position: fixed; inset: 0; z-index: 100" hidden>
     <div class="fixture-resize-handler" style="position: fixed; left: 0; top: 0; width: 24px; height: 24px"></div>
-    <div class="componentsemojiim-saas-modal" style="width: 0; height: 0; position: relative">
       <div class="componentsemojiemojiPanel" style="position: absolute; left: calc(100vw - 380px); top: calc(100vh - 320px); width: 350px; background: white">
       <div id="official-list" style="max-height: 220px; overflow: auto" hidden>
         ${labels
@@ -90,16 +90,17 @@ async function installFixture(
     document.body.dataset.cornerClicks = '0'
     document.body.dataset.enters = '0'
     document.body.dataset.inputs = '0'
-    const initialModal = document.querySelector<HTMLElement>('.semi-modal-wrap')!
-    const template = initialModal.cloneNode(true) as HTMLElement
+    const initialPortal = document.querySelector<HTMLElement>('.componentsemojiim-saas-modal')!
+    const template = initialPortal.cloneNode(true) as HTMLElement
     const fixture = {
-      bindModal(modal: HTMLElement): void {
+      bindPortal(portal: HTMLElement): void {
+        const modal = portal.querySelector<HTMLElement>('.semi-modal-wrap')!
         modal.addEventListener('click', (event) => {
           if (event.target === modal) {
             document.body.dataset.backdropClicks = String(
               Number(document.body.dataset.backdropClicks) + 1,
             )
-            modal.remove()
+            portal.remove()
           }
         })
         // Match the real handler topology: only the image box submits and closes the modal.
@@ -108,22 +109,22 @@ async function installFixture(
             document.body.dataset.imageClicks = String(
               Number(document.body.dataset.imageClicks) + 1,
             )
-            modal.remove()
+            portal.remove()
           })
         })
       },
     }
-    fixture.bindModal(initialModal)
+    fixture.bindPortal(initialPortal)
     document.addEventListener('click', (event) => {
       const target = event.target as Element
       if (target.closest('.messageMsgInputiconAction')) {
-        let modal = document.querySelector<HTMLElement>('.semi-modal-wrap')
-        if (!modal) {
-          modal = template.cloneNode(true) as HTMLElement
-          fixture.bindModal(modal)
-          document.body.appendChild(modal)
+        let portal = document.querySelector<HTMLElement>('.componentsemojiim-saas-modal')
+        if (!portal) {
+          portal = template.cloneNode(true) as HTMLElement
+          fixture.bindPortal(portal)
+          document.body.appendChild(portal)
         }
-        modal.hidden = false
+        portal.querySelector<HTMLElement>('.semi-modal-wrap')!.hidden = false
         document.body.dataset.openerClicks = String(Number(document.body.dataset.openerClicks) + 1)
       }
       if (target.closest('#official-tab')) {
@@ -163,6 +164,8 @@ test('dry-run uses the visible panel inside a zero-sized portal, then closes wit
   await page.locator('.messageMsgInputinputAction > svg.messageMsgInputiconAction').click()
   assert.equal(await page.locator('.componentsemojiim-saas-modal').isVisible(), false)
   assert.equal(await page.locator('.componentsemojiemojiPanel').isVisible(), true)
+  assert.equal(await page.locator('.componentsemojiim-saas-modal .semi-modal-wrap').count(), 1)
+  assert.equal(await page.locator('.semi-modal-wrap .componentsemojiim-saas-modal').count(), 0)
   assert.equal(
     await page.evaluate(() => document.elementFromPoint(1, 1)?.className),
     'fixture-resize-handler',
@@ -175,6 +178,7 @@ test('dry-run uses the visible panel inside a zero-sized portal, then closes wit
   assert.equal(await page.getAttribute('body', 'data-corner-clicks'), '0')
   assert.equal(await page.locator('.componentsemojiemojiPanel').isVisible(), false)
   assert.equal(await page.locator('.semi-modal-wrap').count(), 0)
+  assert.equal(await page.locator('.componentsemojiim-saas-modal').count(), 0)
   await assertNoTextInput()
 })
 
@@ -187,6 +191,7 @@ test('official live mode clicks the exact image box once without clicking its la
   assert.equal(await page.getAttribute('body', 'data-opener-clicks'), '1')
   assert.equal(await page.getAttribute('body', 'data-backdrop-clicks'), '0')
   assert.equal(await page.locator('.semi-modal-wrap').count(), 0)
+  assert.equal(await page.locator('.componentsemojiim-saas-modal').count(), 0)
   await assertNoTextInput()
 })
 
@@ -305,6 +310,7 @@ test('two dry-runs reopen and close the panel without sending to either recipien
   assert.equal(await page.getAttribute('body', 'data-backdrop-clicks'), '2')
   assert.equal(await page.getAttribute('body', 'data-item-clicks'), '0')
   assert.equal(await page.locator('.componentsemojiemojiPanel').isVisible(), false)
+  assert.equal(await page.locator('.componentsemojiim-saas-modal').count(), 0)
   await assertNoTextInput()
 })
 

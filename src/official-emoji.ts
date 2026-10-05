@@ -89,8 +89,8 @@ export async function prepareOrSubmitOfficialEmoji(
 
   if (dryRun) {
     const wrapper = page
-      .locator('.semi-modal-wrap')
-      .filter({ has: panel })
+      .locator('.componentsemojiim-saas-modal .semi-modal-wrap')
+      .filter({ has: page.locator('.componentsemojiemojiPanel') })
       .filter({ visible: true })
     if ((await wrapper.count()) !== 1) {
       throw new Error('官方表情背景缺失或不唯一，无法关闭验证面板；未提交表情')
