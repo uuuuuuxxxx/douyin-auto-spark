@@ -41,6 +41,7 @@ test('message mode keeps the original behavior unless daily is explicitly enable
   assert.equal(resolveSparkMessageMode(''), 'default')
   assert.equal(resolveSparkMessageMode('default'), 'default')
   assert.equal(resolveSparkMessageMode(' DAILY '), 'daily')
+  assert.equal(resolveSparkMessageMode(' OFFICIAL-EMOJI '), 'official-emoji')
   assert.throws(() => resolveSparkMessageMode('random'), /SPARK_MESSAGE_MODE/)
 })
 

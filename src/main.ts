@@ -10,6 +10,12 @@ import timezone from 'dayjs/plugin/timezone'
 import type { DouyinCookie, SameSite } from './types/douyin-cookie'
 import type { Yiyan } from './types/yiyan'
 import { resolveDryRun, submitMessage, waitForChatSearch } from './chat-session'
+import { normalizeConversationSearchQuery } from './search-query'
+import {
+  prepareOrSubmitOfficialEmoji,
+  selectDailyOfficialEmoji,
+  type OfficialEmojiName,
+} from './official-emoji'
 import {
   readDailySparkMessages,
   resolveSparkMessageMode,
@@ -66,6 +72,7 @@ async function main(): Promise<void> {
   const messageMode = resolveSparkMessageMode()
   const dailyMessage =
     messageMode === 'daily' ? selectDailySparkMessage(await readDailySparkMessages()) : undefined
+  const officialEmoji = messageMode === 'official-emoji' ? selectDailyOfficialEmoji() : undefined
   const includeYiyanSource = resolveYiyanIncludeSource()
   const globalMessageTemplate = resolveSparkMessageTemplate()
   const accounts = resolveDouyinAccounts(globalMessageTemplate)
@@ -87,6 +94,7 @@ async function main(): Promise<void> {
           autoClose,
           dryRun,
           dailyMessage,
+          officialEmoji,
         )
       } catch (error) {
         const accountError = toError(error)
@@ -134,6 +142,7 @@ async function runDouyinAccount(
   autoClose: boolean,
   dryRun: boolean,
   dailyMessage: string | undefined,
+  officialEmoji: OfficialEmojiName | undefined,
 ): Promise<void> {
   const context = await browser.newContext()
   let page: Page | undefined
@@ -178,6 +187,17 @@ async function runDouyinAccount(
         )
         .first()
       await editorInput.waitFor({ state: 'visible', timeout: 10000 })
+
+      if (officialEmoji !== undefined) {
+        await prepareOrSubmitOfficialEmoji(page, officialEmoji, dryRun)
+        console.log(
+          dryRun
+            ? `[${account.name}] 无发送验证通过：${targetName}（官方表情：${officialEmoji}，未点击发送）`
+            : `[${account.name}] 已提交官方表情：${targetName}（${officialEmoji}）`,
+        )
+        await page.waitForTimeout(1000)
+        continue
+      }
 
       let message: string
 
@@ -284,7 +304,7 @@ async function searchConversation(
       .waitFor({ state: 'hidden', timeout: SEARCH_RESULT_TIMEOUT })
       .catch(() => {})
     await page.waitForTimeout(SEARCH_INPUT_RESET_DELAY)
-    await searchInput.fill(targetName)
+    await searchInput.fill(normalizeConversationSearchQuery(targetName))
 
     const searchResultVisible = await searchResult
       .waitFor({ state: 'visible', timeout: SEARCH_RESULT_TIMEOUT })
