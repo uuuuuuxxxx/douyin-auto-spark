@@ -2,6 +2,11 @@ name: 🚀 续一次火
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '仅验证登录与好友定位，不发送消息'
+        type: boolean
+        default: true
   schedule:
     - cron: "0 0,2,4 * * *"
       timezone: "Asia/Shanghai"
@@ -43,9 +48,13 @@ jobs:
               return createdAt >= dayStart && createdAt < dayEnd;
             });
             const hasSuccessfulRun = previousRunsToday.some(
-              (run) => run.conclusion === 'success',
+              // 仅定时续火成功能阻止补跑；手动无发送验证不代表已经续火。
+              (run) => run.event === 'schedule' && run.conclusion === 'success',
             );
-            const isRetry = !hasSuccessfulRun && previousRunsToday.length > 0;
+            const hasFailedScheduledRun = previousRunsToday.some(
+              (run) => run.event === 'schedule' && ['failure', 'timed_out', 'cancelled'].includes(run.conclusion),
+            );
+            const isRetry = !hasSuccessfulRun && hasFailedScheduledRun;
 
             core.setOutput('should_run', hasSuccessfulRun ? 'false' : 'true');
             core.setOutput('is_retry', isRetry ? 'true' : 'false');
@@ -94,6 +103,8 @@ jobs:
           DOUYIN_TARGET_NAMES: ${{ secrets.DOUYIN_TARGET_NAMES }}
           YIYAN_INCLUDE_SOURCE: ${{ secrets.YIYAN_INCLUDE_SOURCE }}
           SPARK_MESSAGE_TEMPLATE: ${{ secrets.SPARK_MESSAGE_TEMPLATE }}
+          SPARK_MESSAGE_MODE: 'daily'
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
         run: bun src/main.ts
 
       - name: 上传失败截图 (Upload failure screenshots)

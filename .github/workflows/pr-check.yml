@@ -29,4 +29,7 @@ jobs:
           HUSKY: "0"
 
       - name: 运行检查 (Run check)
-        run: pnpm check
+        # 回归测试仅加载本地 HTML，不访问抖音或发送消息。
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm check

@@ -110,6 +110,9 @@ Actions -> 点击绿色的 I understand my workflows, go ahead and enable them -
 
 点击 `Run workflow` 后等待任务完成。手机打开抖音，你就可以发现你发了一条嘉豪语录给朋友了
 
+手动运行现默认勾选 `dry_run`：只验证登录、好友搜索和聊天编辑器，不输入或发送消息。
+需要实际续火时取消勾选；定时任务仍正常发送。手动验证成功不会让当天定时任务跳过续火。
+
 ![run-workflow](assets/readme/run-workflow.jpg)
 
 #### 4️⃣ 每天自动运行
@@ -145,6 +148,8 @@ cp .env.example .env
 | `PLAYWRIGHT_BROWSER_PATH` | ❌ | - | 本机 Chrome / Chromium / Edge 可执行文件路径，不填则使用 Playwright 默认浏览器 |
 | `PLAYWRIGHT_HEADLESS` | ❌ | `true` | 是否使用无头模式 |
 | `AUTO_CLOSE` | ❌ | `true` | 发送完成后是否自动关闭浏览器 |
+| `DRY_RUN` | ❌ | `false` | 为 `true` 时仅验证登录与好友定位，不输入或发送消息 |
+| `SPARK_MESSAGE_MODE` | ❌ | `default` | `daily` 按北京时间每日轮换消息；`default` 沿用自定义模板/一言 |
 
 #### 3️⃣ 启动项目
 
@@ -153,6 +158,28 @@ pnpm dev
 ```
 
 脚本会打开 `https://www.douyin.com/chat`，依次定位配置中的好友并发送随机一言。
+
+### 登录失败时刷新凭据
+
+如果失败截图显示扫码登录弹窗，说明保存的 Cookie 未通过网页版认证；仅增加重试不能恢复登录。
+脚本会区分 `DOUYIN_LOGIN_REQUIRED`（需要重新登录）、`DOUYIN_VERIFICATION_REQUIRED`
+（需要人工安全验证）和 `DOUYIN_CHAT_NOT_READY`（加载或页面结构问题），保留失败截图。
+
+可在本机运行 `pnpm refresh-cookie`。没有配置本机浏览器路径时，先运行
+`pnpm exec playwright install chromium`。工具会打开独立浏览器，请在 5 分钟内用手机抖音扫码登录，
+完成后把凭据保存为项目根目录 `.douyin-cookie.json`，不发送消息。
+
+将该文件的完整 JSON 更新到 GitHub Actions 的 `DOUYIN_COOKIE` Secret；多账号则只替换对应账号的
+`cookie` 字段。凭据文件已加入 `.gitignore`，不要上传到代码仓库或聊天。
+更新后先手动运行并保持 `dry_run` 勾选，确认登录与所有好友定位通过，再取消勾选续火或等待定时任务。
+开发检查用 `pnpm check`；回归测试只加载本地 HTML，不访问抖音。
+
+### 每天更换续火内容
+
+当前工作流启用 `SPARK_MESSAGE_MODE=daily`，从 `assets/spark-messages.json` 的 30 条简短续火消息中
+按北京时间每天选一条，30 天循环。同一天补跑使用同一条，跨北京时间午夜会更换；该模式优先于自定义模板。
+修改这个 JSON 数组即可换消息库，至少保留两条不同且非空的内容。
+将模式改为 `default` 可恢复原来的自定义模板或随机一言。
 
 
 ## 📮 邮件通知配置
