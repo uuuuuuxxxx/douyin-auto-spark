@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 
-export type SparkMessageMode = 'default' | 'daily'
+export type SparkMessageMode = 'default' | 'daily' | 'official-emoji'
 
 export function resolveSparkMessageMode(value = process.env.SPARK_MESSAGE_MODE): SparkMessageMode {
   const mode = value?.trim().toLowerCase()
@@ -9,11 +9,11 @@ export function resolveSparkMessageMode(value = process.env.SPARK_MESSAGE_MODE):
     return 'default'
   }
 
-  if (mode === 'daily') {
-    return 'daily'
+  if (mode === 'daily' || mode === 'official-emoji') {
+    return mode
   }
 
-  throw new Error('SPARK_MESSAGE_MODE 只能配置为 default 或 daily')
+  throw new Error('SPARK_MESSAGE_MODE 只能配置为 default、daily 或 official-emoji')
 }
 
 export function validateDailySparkMessages(value: unknown): string[] {

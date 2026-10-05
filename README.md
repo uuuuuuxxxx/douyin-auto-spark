@@ -149,7 +149,7 @@ cp .env.example .env
 | `PLAYWRIGHT_HEADLESS` | ❌ | `true` | 是否使用无头模式 |
 | `AUTO_CLOSE` | ❌ | `true` | 发送完成后是否自动关闭浏览器 |
 | `DRY_RUN` | ❌ | `false` | 为 `true` 时仅验证登录与好友定位，不输入或发送消息 |
-| `SPARK_MESSAGE_MODE` | ❌ | `default` | `daily` 按北京时间每日轮换消息；`default` 沿用自定义模板/一言 |
+| `SPARK_MESSAGE_MODE` | ❌ | `default` | `official-emoji` 每日轮换官方表情；`daily` 每日轮换文本；`default` 沿用模板/一言 |
 
 #### 3️⃣ 启动项目
 
@@ -176,10 +176,15 @@ pnpm dev
 
 ### 每天更换续火内容
 
-当前工作流启用 `SPARK_MESSAGE_MODE=daily`，从 `assets/spark-messages.json` 的 30 条简短续火消息中
-按北京时间每天选一条，30 天循环。同一天补跑使用同一条，跨北京时间午夜会更换；该模式优先于自定义模板。
-修改这个 JSON 数组即可换消息库，至少保留两条不同且非空的内容。
-将模式改为 `default` 可恢复原来的自定义模板或随机一言。
+当前工作流启用 `SPARK_MESSAGE_MODE=official-emoji`，打开聊天底栏的官方表情面板，
+每天轮换“续火花”“比心”“嗨”（打招呼）“开心”“爱心”，5 天循环。
+同一天补跑使用同一表情，跨北京时间午夜更换；该模式优先于自定义模板。
+正式运行直接点击面板中的官方表情，不输入表情名称、不额外按回车。
+如果官方表情不存在、重复或不可用，任务报错并保存截图，不擅自替换成文字。
+`DRY_RUN=true` 仅展开面板并验证当天表情，绝不点击表情项。
+
+改为 `daily` 可使用 `assets/spark-messages.json` 中 30 条简短文本每日轮换；
+修改该数组时至少保留两条不同且非空的内容。改为 `default` 可恢复自定义模板或随机一言。
 
 
 ## 📮 邮件通知配置
