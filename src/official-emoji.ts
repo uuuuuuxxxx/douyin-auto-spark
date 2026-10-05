@@ -88,10 +88,61 @@ export async function prepareOrSubmitOfficialEmoji(
   }
 
   if (dryRun) {
-    if ((await opener.count()) !== 1 || !(await opener.isEnabled())) {
-      throw new Error('官方表情面板入口不可用，无法收起验证面板；未提交表情')
+    const wrapper = page
+      .locator('.semi-modal-wrap')
+      .filter({ has: panel })
+      .filter({ visible: true })
+    if ((await wrapper.count()) !== 1) {
+      throw new Error('官方表情背景缺失或不唯一，无法关闭验证面板；未提交表情')
     }
-    await opener.click({ timeout })
+    const [wrapperBox, panelBox] = await Promise.all([wrapper.boundingBox(), panel.boundingBox()])
+    if (!wrapperBox || !panelBox) {
+      throw new Error('官方表情背景或面板尺寸不可用；未提交表情')
+    }
+    const wrapperRight = wrapperBox.x + wrapperBox.width
+    const wrapperBottom = wrapperBox.y + wrapperBox.height
+    const panelRight = panelBox.x + panelBox.width
+    const panelBottom = panelBox.y + panelBox.height
+    const centerX = wrapperBox.x + wrapperBox.width / 2
+    const centerY = wrapperBox.y + wrapperBox.height / 2
+    const candidates = [
+      { x: centerX, y: (wrapperBox.y + panelBox.y) / 2 },
+      { x: (wrapperBox.x + panelBox.x) / 2, y: centerY },
+      { x: centerX, y: (panelBottom + wrapperBottom) / 2 },
+      { x: (panelRight + wrapperRight) / 2, y: centerY },
+      { x: centerX, y: centerY },
+    ]
+    let background: { x: number; y: number } | undefined
+    for (const point of candidates) {
+      const insideWrapper =
+        point.x > wrapperBox.x &&
+        point.x < wrapperRight &&
+        point.y > wrapperBox.y &&
+        point.y < wrapperBottom
+      const insidePanel =
+        point.x >= panelBox.x &&
+        point.x <= panelRight &&
+        point.y >= panelBox.y &&
+        point.y <= panelBottom
+      if (
+        insideWrapper &&
+        !insidePanel &&
+        (await wrapper.evaluate(
+          (element, candidate) => document.elementFromPoint(candidate.x, candidate.y) === element,
+          point,
+        ))
+      ) {
+        background = point
+        break
+      }
+    }
+    if (!background) {
+      throw new Error('未找到安全的官方表情背景点击位置；未提交表情')
+    }
+    await wrapper.click({
+      position: { x: background.x - wrapperBox.x, y: background.y - wrapperBox.y },
+      timeout,
+    })
     await panel.waitFor({ state: 'hidden', timeout })
     return 'verified'
   }

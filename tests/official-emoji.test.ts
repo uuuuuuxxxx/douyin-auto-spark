@@ -54,9 +54,11 @@ async function installFixture(
         <circle cx="16" cy="16" r="15"></circle>
       </svg>
     </div>
+    <div class="semi-modal-wrap" style="position: fixed; inset: 0; z-index: 100" hidden>
+    <div class="fixture-resize-handler" style="position: fixed; left: 0; top: 0; width: 24px; height: 24px"></div>
     <div class="componentsemojiim-saas-modal" style="width: 0; height: 0; position: relative">
-      <div class="componentsemojiemojiPanel" style="position: absolute; width: 350px" hidden>
-      <div id="official-list" hidden>
+      <div class="componentsemojiemojiPanel" style="position: absolute; left: calc(100vw - 380px); top: calc(100vh - 320px); width: 350px; background: white">
+      <div id="official-list" style="max-height: 220px; overflow: auto" hidden>
         ${labels
           .map(
             (
@@ -76,6 +78,7 @@ async function installFixture(
       <button class="emojiEmojisModalTabsubTab">其他表情</button>
       </div>
     </div>
+    </div>
     <div contenteditable="true" id="editor">原有草稿</div>
   `)
   await page.evaluate(() => {
@@ -83,13 +86,44 @@ async function installFixture(
     document.body.dataset.imageClicks = '0'
     document.body.dataset.descClicks = '0'
     document.body.dataset.openerClicks = '0'
+    document.body.dataset.backdropClicks = '0'
+    document.body.dataset.cornerClicks = '0'
     document.body.dataset.enters = '0'
     document.body.dataset.inputs = '0'
+    const initialModal = document.querySelector<HTMLElement>('.semi-modal-wrap')!
+    const template = initialModal.cloneNode(true) as HTMLElement
+    const fixture = {
+      bindModal(modal: HTMLElement): void {
+        modal.addEventListener('click', (event) => {
+          if (event.target === modal) {
+            document.body.dataset.backdropClicks = String(
+              Number(document.body.dataset.backdropClicks) + 1,
+            )
+            modal.remove()
+          }
+        })
+        // Match the real handler topology: only the image box submits and closes the modal.
+        modal.querySelectorAll('.emojiEmojiItemimgBox').forEach((imageBox) => {
+          imageBox.addEventListener('click', () => {
+            document.body.dataset.imageClicks = String(
+              Number(document.body.dataset.imageClicks) + 1,
+            )
+            modal.remove()
+          })
+        })
+      },
+    }
+    fixture.bindModal(initialModal)
     document.addEventListener('click', (event) => {
       const target = event.target as Element
       if (target.closest('.messageMsgInputiconAction')) {
-        const panel = document.querySelector<HTMLElement>('.componentsemojiemojiPanel')!
-        panel.hidden = !panel.hidden
+        let modal = document.querySelector<HTMLElement>('.semi-modal-wrap')
+        if (!modal) {
+          modal = template.cloneNode(true) as HTMLElement
+          fixture.bindModal(modal)
+          document.body.appendChild(modal)
+        }
+        modal.hidden = false
         document.body.dataset.openerClicks = String(Number(document.body.dataset.openerClicks) + 1)
       }
       if (target.closest('#official-tab')) {
@@ -102,12 +136,9 @@ async function installFixture(
       if (target.closest('.emojiEmojiItememojiItemDesc')) {
         document.body.dataset.descClicks = String(Number(document.body.dataset.descClicks) + 1)
       }
-    })
-    // Match the real handler topology: only the image box submits; its label sibling does not.
-    document.querySelectorAll('.emojiEmojiItemimgBox').forEach((imageBox) => {
-      imageBox.addEventListener('click', () => {
-        document.body.dataset.imageClicks = String(Number(document.body.dataset.imageClicks) + 1)
-      })
+      if (target.closest('.fixture-resize-handler')) {
+        document.body.dataset.cornerClicks = String(Number(document.body.dataset.cornerClicks) + 1)
+      }
     })
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -132,11 +163,18 @@ test('dry-run uses the visible panel inside a zero-sized portal, then closes wit
   await page.locator('.messageMsgInputinputAction > svg.messageMsgInputiconAction').click()
   assert.equal(await page.locator('.componentsemojiim-saas-modal').isVisible(), false)
   assert.equal(await page.locator('.componentsemojiemojiPanel').isVisible(), true)
+  assert.equal(
+    await page.evaluate(() => document.elementFromPoint(1, 1)?.className),
+    'fixture-resize-handler',
+  )
   assert.equal(await prepareOrSubmitOfficialEmoji(page, '嗨', true, 500), 'verified')
   assert.equal(await page.getAttribute('body', 'data-item-clicks'), '0')
   assert.equal(await page.getAttribute('body', 'data-image-clicks'), '0')
-  assert.equal(await page.getAttribute('body', 'data-opener-clicks'), '2')
+  assert.equal(await page.getAttribute('body', 'data-opener-clicks'), '1')
+  assert.equal(await page.getAttribute('body', 'data-backdrop-clicks'), '1')
+  assert.equal(await page.getAttribute('body', 'data-corner-clicks'), '0')
   assert.equal(await page.locator('.componentsemojiemojiPanel').isVisible(), false)
+  assert.equal(await page.locator('.semi-modal-wrap').count(), 0)
   await assertNoTextInput()
 })
 
@@ -147,6 +185,8 @@ test('official live mode clicks the exact image box once without clicking its la
   assert.equal(await page.getAttribute('body', 'data-image-clicks'), '1')
   assert.equal(await page.getAttribute('body', 'data-desc-clicks'), '0')
   assert.equal(await page.getAttribute('body', 'data-opener-clicks'), '1')
+  assert.equal(await page.getAttribute('body', 'data-backdrop-clicks'), '0')
+  assert.equal(await page.locator('.semi-modal-wrap').count(), 0)
   await assertNoTextInput()
 })
 
@@ -261,9 +301,27 @@ test('two dry-runs reopen and close the panel without sending to either recipien
   await installFixture()
   await prepareOrSubmitOfficialEmoji(page, '续火花', true, 500)
   await prepareOrSubmitOfficialEmoji(page, '比心', true, 500)
-  assert.equal(await page.getAttribute('body', 'data-opener-clicks'), '4')
+  assert.equal(await page.getAttribute('body', 'data-opener-clicks'), '2')
+  assert.equal(await page.getAttribute('body', 'data-backdrop-clicks'), '2')
   assert.equal(await page.getAttribute('body', 'data-item-clicks'), '0')
   assert.equal(await page.locator('.componentsemojiemojiPanel').isVisible(), false)
+  await assertNoTextInput()
+})
+
+test('a background covered by other elements fails without any click or keyboard fallback', async () => {
+  await installFixture(['嗨'])
+  await page.locator('.semi-modal-wrap').evaluate((wrapper) => {
+    const blocker = document.createElement('div')
+    blocker.style.cssText = 'position: absolute; inset: 0; z-index: 1'
+    wrapper.appendChild(blocker)
+    const panel = wrapper.querySelector<HTMLElement>('.componentsemojiemojiPanel')!
+    panel.style.zIndex = '2'
+  })
+  await assert.rejects(prepareOrSubmitOfficialEmoji(page, '嗨', true, 500), /未找到安全/)
+  assert.equal(await page.getAttribute('body', 'data-item-clicks'), '0')
+  assert.equal(await page.getAttribute('body', 'data-image-clicks'), '0')
+  assert.equal(await page.getAttribute('body', 'data-backdrop-clicks'), '0')
+  assert.equal(await page.getAttribute('body', 'data-opener-clicks'), '1')
   await assertNoTextInput()
 })
 
