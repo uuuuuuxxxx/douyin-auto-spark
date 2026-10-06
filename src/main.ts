@@ -11,6 +11,9 @@ import type { DouyinCookie, SameSite } from './types/douyin-cookie'
 import type { Yiyan } from './types/yiyan'
 import { resolveDryRun, submitMessage, waitForChatSearch } from './chat-session'
 import { normalizeConversationSearchQuery } from './search-query'
+import { waitForConversation } from './chat-context'
+import { confirmMessageSend } from './send-confirmation'
+import { attachConversationIdentity } from './chat-identity'
 import {
   prepareOrSubmitOfficialEmoji,
   selectDailyOfficialEmoji,
@@ -70,8 +73,15 @@ async function main(): Promise<void> {
   const autoClose = resolveAutoClose()
   const dryRun = resolveDryRun()
   const messageMode = resolveSparkMessageMode()
+  if (messageMode === 'official-emoji' && !dryRun) {
+    throw new Error('互动大表情尚未支持服务器发送确认，请使用 pig-emoji 发送猪头小表情')
+  }
   const dailyMessage =
-    messageMode === 'daily' ? selectDailySparkMessage(await readDailySparkMessages()) : undefined
+    messageMode === 'pig-emoji'
+      ? '[猪头]'
+      : messageMode === 'daily'
+        ? selectDailySparkMessage(await readDailySparkMessages())
+        : undefined
   const officialEmoji = messageMode === 'official-emoji' ? selectDailyOfficialEmoji() : undefined
   const includeYiyanSource = resolveYiyanIncludeSource()
   const globalMessageTemplate = resolveSparkMessageTemplate()
@@ -146,12 +156,14 @@ async function runDouyinAccount(
 ): Promise<void> {
   const context = await browser.newContext()
   let page: Page | undefined
+  let identity: ReturnType<typeof attachConversationIdentity> | undefined
 
   try {
     console.log(`开始执行账号：${account.name}`)
     await context.addCookies(account.cookies)
 
     page = await context.newPage()
+    identity = attachConversationIdentity(page)
     await page.goto('https://www.douyin.com/chat', {
       waitUntil: 'domcontentloaded',
     })
@@ -179,6 +191,7 @@ async function runDouyinAccount(
       }
 
       await searchResult.getByText(/^(发消息|发私信)$/).click({ timeout: 5000 })
+      await waitForConversation(page, targetName)
       console.log(`[${account.name}] 已打开私信：${targetName}`)
 
       const editorInput = page
@@ -215,11 +228,22 @@ async function runDouyinAccount(
         message = includeYiyanSource ? `${yiyan.hitokoto}\n——「${yiyan.from}」` : yiyan.hitokoto
       }
 
-      await submitMessage(page, editorInput, message, dryRun)
+      const expectedConversationId = await identity.expectedConversationId(targetName)
+      if (dryRun) {
+        await submitMessage(page, editorInput, message, true)
+      } else {
+        if ((await editorInput.innerText()).replace(/[\u200b\ufeff]/g, '').trim()) {
+          throw new Error('聊天编辑器存在草稿，未覆盖或发送；请先处理草稿')
+        }
+        await confirmMessageSend(page, () => submitMessage(page!, editorInput, message, false), {
+          expectedText: message,
+          expectedConversationId,
+        })
+      }
       console.log(
         dryRun
           ? `[${account.name}] 无发送验证通过：${targetName}（未输入或发送消息）`
-          : `[${account.name}] 已提交消息：${targetName}`,
+          : `[${account.name}] 抖音发送接口已确认：${targetName}`,
       )
       await page.waitForTimeout(1000)
     }
@@ -239,6 +263,7 @@ async function runDouyinAccount(
     await captureFailureScreenshot(page, account.name)
     throw error
   } finally {
+    identity?.dispose()
     if (autoClose) {
       await context.close()
     }

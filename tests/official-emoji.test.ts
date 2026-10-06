@@ -197,7 +197,7 @@ test('official live mode clicks the exact image box once without clicking its la
 
 test('a missing exact label fails without clicking a similar label or sending text', async () => {
   await installFixture(['嗨一下'])
-  await assert.rejects(prepareOrSubmitOfficialEmoji(page, '嗨', false, 50), /未找到/)
+  await assert.rejects(prepareOrSubmitOfficialEmoji(page, '嗨', false, 1000), /未找到/)
   assert.equal(await page.getAttribute('body', 'data-item-clicks'), '0')
   await assertNoTextInput()
 })
